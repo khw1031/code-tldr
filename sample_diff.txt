@@ -1,0 +1,2966 @@
+diff --git a/apps/as-mobile/src/app/providers/router-provider.tsx b/apps/as-mobile/src/app/providers/router-provider.tsx
+index 7adc68a..d7cf03a 100644
+--- a/apps/as-mobile/src/app/providers/router-provider.tsx
++++ b/apps/as-mobile/src/app/providers/router-provider.tsx
+@@ -6,9 +6,10 @@ import {
+   useRouteError,
+ } from "react-router-dom";
+ import { BaseService } from "@/shared/apis/base-service";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { routePaths } from "@/shared/lib/react-router";
+ import { error404PageRoute } from "@/pages/error";
+ import { homePageRoute } from "@/pages/home";
++import { inquiryPageRoute } from "@/pages/inquiry";
+ import { lazyLayout } from "@/pages/layout";
+ import { schedulePageRoute } from "@/pages/schedule";
+ import { testPageRoute } from "@/pages/test";
+@@ -37,14 +38,19 @@ const browserRouter = createBrowserRouter([
+       {
+         lazy: lazyLayout,
+         HydrateFallback: () => null,
+-        children: [testPageRoute, homePageRoute, schedulePageRoute],
++        children: [
++          testPageRoute,
++          homePageRoute,
++          schedulePageRoute,
++          inquiryPageRoute,
++        ],
+       },
+       {
+         element: <Outlet />,
+         children: [error404PageRoute],
+       },
+       {
+-        loader: async () => redirect(routePathKeys.errorPage404()),
++        loader: async () => redirect(routePaths.errorPage404()),
+         path: "*",
+       },
+     ],
+diff --git a/apps/as-mobile/src/features/schedule/schedule-details/schedule-details.ui.tsx b/apps/as-mobile/src/features/schedule/schedule-details/schedule-details.ui.tsx
+index d6a3956..bffa475 100644
+--- a/apps/as-mobile/src/features/schedule/schedule-details/schedule-details.ui.tsx
++++ b/apps/as-mobile/src/features/schedule/schedule-details/schedule-details.ui.tsx
+@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
+ import { GridDisplay } from "@erp/mui";
+ import { composeHoc, withSuspense, withErrorBoundary } from "@erp/shared/hoc";
+ // import { FallbackLoading } from "@/shared/ui";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { routePaths } from "@/shared/lib/react-router";
+ import { ErrorHandler } from "@/shared/ui/error";
+ import { scheduleDetailsQueryOptions } from "@/entities/schedule";
+ import { ScheduleDetailsSkeleton } from "./schedule-details.skeleton";
+@@ -180,7 +180,7 @@ export const ScheduleDetails = enhance(({ callNo }) => {
+               color="secondary"
+               fullWidth
+               onClick={() => {
+-                navigate(routePathKeys.schedule.bySlug({ slug: callNo }));
++                navigate(routePaths.schedule.bySlug({ slug: callNo }));
+               }}
+             >
+               상세보기
+diff --git a/apps/as-mobile/src/pages/error/error-404-page.route.tsx b/apps/as-mobile/src/pages/error/error-404-page.route.tsx
+index 83c5b70..97f76bc 100644
+--- a/apps/as-mobile/src/pages/error/error-404-page.route.tsx
++++ b/apps/as-mobile/src/pages/error/error-404-page.route.tsx
+@@ -1,8 +1,8 @@
+ import type { RouteObject } from "react-router-dom";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { ROUTE_PATHS } from "@/shared/lib/react-router";
+ 
+ export const error404PageRoute: RouteObject = {
+-  path: routePathKeys.errorPage404(),
++  path: ROUTE_PATHS.ERROR_PAGE_404,
+   lazy: async () => {
+     const Component = await import("./error-404-page.ui").then(
+       (module) => module.Error404Page,
+diff --git a/apps/as-mobile/src/pages/home/home-page.route.tsx b/apps/as-mobile/src/pages/home/home-page.route.tsx
+index e8d8ce9..5c2469d 100644
+--- a/apps/as-mobile/src/pages/home/home-page.route.tsx
++++ b/apps/as-mobile/src/pages/home/home-page.route.tsx
+@@ -1,8 +1,8 @@
+ import type { RouteObject } from "react-router-dom";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { routePaths } from "@/shared/lib/react-router";
+ 
+ export const homePageRoute: RouteObject = {
+-  path: routePathKeys.home(),
++  path: routePaths.home(),
+   lazy: async () => {
+     const [Component] = await Promise.all([
+       import("./home-page.ui").then((module) => module.HomePage),
+diff --git a/apps/as-mobile/src/pages/inquiry/index.ts b/apps/as-mobile/src/pages/inquiry/index.ts
+new file mode 100644
+index 0000000..f45a395
+--- /dev/null
++++ b/apps/as-mobile/src/pages/inquiry/index.ts
+@@ -0,0 +1 @@
++export * from "./inquiry-page.route";
+diff --git a/apps/as-mobile/src/pages/inquiry/inquiry-page.loader.ts b/apps/as-mobile/src/pages/inquiry/inquiry-page.loader.ts
+new file mode 100644
+index 0000000..6b84cbc
+--- /dev/null
++++ b/apps/as-mobile/src/pages/inquiry/inquiry-page.loader.ts
+@@ -0,0 +1,21 @@
++import { LoaderFunctionArgs, redirect } from "react-router-dom";
++import { z } from "zod";
++import { routePaths } from "@/shared/lib/react-router";
++
++export function indexPageLoader() {
++  return redirect(routePaths.errorPage404());
++}
++
++export function inquiryPageLoader(args: LoaderFunctionArgs) {
++  const parsedArgs = InquiryPageLoaderArgsSchema.parse(args);
++
++  return parsedArgs;
++}
++
++const InquiryPageLoaderArgsSchema = z.object({
++  request: z.custom<Request>(),
++  params: z.object({ slug: z.string() }),
++  context: z.any(),
++});
++
++export type InquiryPageLoaderArgs = z.infer<typeof InquiryPageLoaderArgsSchema>;
+diff --git a/apps/as-mobile/src/pages/inquiry/inquiry-page.route.tsx b/apps/as-mobile/src/pages/inquiry/inquiry-page.route.tsx
+new file mode 100644
+index 0000000..d8134ee
+--- /dev/null
++++ b/apps/as-mobile/src/pages/inquiry/inquiry-page.route.tsx
+@@ -0,0 +1,29 @@
++import { RouteObject } from "react-router-dom";
++import { ROUTE_PATHS } from "@/shared/lib/react-router";
++
++export const inquiryPageRoute: RouteObject = {
++  path: ROUTE_PATHS.INQUIRY.ROOT,
++  children: [
++    {
++      index: true,
++      lazy: async () => {
++        const loader = await import("./inquiry-page.loader").then(
++          (module) => module.indexPageLoader,
++        );
++        return { loader };
++      },
++    },
++    {
++      path: ROUTE_PATHS.INQUIRY.BY_SLUG,
++      lazy: async () => {
++        const [loader, Component] = await Promise.all([
++          import("./inquiry-page.loader").then(
++            (module) => module.inquiryPageLoader,
++          ),
++          import("./inquiry-page.ui").then((module) => module.InquiryPage),
++        ]);
++        return { loader, Component };
++      },
++    },
++  ],
++};
+diff --git a/apps/as-mobile/src/pages/inquiry/inquiry-page.ui.tsx b/apps/as-mobile/src/pages/inquiry/inquiry-page.ui.tsx
+new file mode 100644
+index 0000000..c6bd8df
+--- /dev/null
++++ b/apps/as-mobile/src/pages/inquiry/inquiry-page.ui.tsx
+@@ -0,0 +1,532 @@
++import CachedIcon from "@mui/icons-material/Cached";
++import EventIcon from "@mui/icons-material/Event";
++import LaunchIcon from "@mui/icons-material/Launch";
++import {
++  Box,
++  Button,
++  Card,
++  Paper,
++  Tab,
++  Tabs,
++  TextField,
++  Typography,
++  Stack,
++  Select,
++  MenuItem,
++  IconButton,
++  InputAdornment,
++  SelectChangeEvent,
++} from "@mui/material";
++import { useState } from "react";
++import { Divider, GridDisplay } from "@erp/mui";
++import { composeHoc, withSuspense } from "@erp/shared/hoc";
++import { FallbackLoading } from "@/shared/ui";
++import { AppBar } from "@/widgets/layouts";
++
++const enhance = composeHoc((component) =>
++  withSuspense(component, { FallbackComponent: FallbackLoading }),
++);
++
++export const InquiryPage = enhance(() => {
++  // 탭 상태 관리
++  const [tabValue, setTabValue] = useState(0);
++
++  // 폼 상태 관리
++  const [formData, setFormData] = useState({
++    requestNumber: "0130470326",
++    customerName: "최",
++    phonePrefix: "010",
++    phoneMiddle: "9999",
++    phoneSuffix: "9999",
++    engineerName: "이",
++    receiptDate: {
++      start: "2025.03.12",
++      end: "2025.03.12",
++    },
++    status: "전체",
++    isOnline: "전체",
++  });
++
++  // 탭 변경 핸들러
++  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
++    setTabValue(newValue);
++  };
++
++  // 폼 입력 핸들러
++  const handleInputChange = (
++    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
++  ) => {
++    const { name, value } = e.target;
++    setFormData({
++      ...formData,
++      [name]: value,
++    });
++  };
++
++  // 셀렉트 입력 핸들러
++  const handleSelectChange = (e: SelectChangeEvent<string>) => {
++    const { name, value } = e.target;
++    setFormData({
++      ...formData,
++      [name as string]: value,
++    });
++  };
++
++  // 검색 결과 데이터 (예시)
++  const searchResults = [
++    {
++      requestNumber: "0130470326",
++      organization: "S000(CTI-컨택센터접수)",
++      receiptDate: "2024.08.07",
++      customerName: "박한",
++      phoneNumber: "010-9999-9999",
++      status: "조치완료",
++      address: "서울특별시 구로구 구로동로 41길\n201호",
++      engineerName: "이한샘",
++      onlineAmount: "30,000",
++    },
++    {
++      requestNumber: "0130470326",
++      organization: "S000(CTI-컨택센터접수)",
++      receiptDate: "2024.08.07",
++      customerName: "박한",
++      phoneNumber: "010-9999-9999",
++      status: "조치완료",
++      address: "서울특별시 구로구 구로동로 41길\n201호",
++      engineerName: "이한샘",
++      onlineAmount: "30,000",
++    },
++    {
++      requestNumber: "0130470326",
++      organization: "S000(CTI-컨택센터접수)",
++      receiptDate: "2024.08.07",
++      customerName: "박한",
++      phoneNumber: "010-9999-9999",
++      status: "조치완료",
++      address: "서울특별시 구로구 구로동로 41길\n201호",
++      engineerName: "이한샘",
++      onlineAmount: "30,000",
++    },
++  ];
++
++  // 검색 핸들러
++  const handleSearch = () => {
++    console.log("검색 수행:", formData);
++    // API 호출 로직 추가
++  };
++
++  // 초기화 핸들러
++  const handleReset = () => {
++    setFormData({
++      requestNumber: "",
++      customerName: "",
++      phonePrefix: "",
++      phoneMiddle: "",
++      phoneSuffix: "",
++      engineerName: "",
++      receiptDate: {
++        start: "",
++        end: "",
++      },
++      status: "전체",
++      isOnline: "전체",
++    });
++  };
++
++  return (
++    <>
++      <AppBar back={true} title="조회" />
++
++      {/* 탭 메뉴 */}
++      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
++        <Tabs
++          value={tabValue}
++          onChange={handleTabChange}
++          variant="fullWidth"
++          aria-label="inquiry tabs"
++        >
++          <Tab
++            label="AS 조회"
++            sx={{
++              color: tabValue === 0 ? "#0C27C1" : "rgba(0, 0, 0, 0.6)",
++              fontWeight: tabValue === 0 ? 500 : 400,
++            }}
++          />
++          <Tab
++            label="오더 조회"
++            sx={{
++              color: tabValue === 1 ? "#0C27C1" : "rgba(0, 0, 0, 0.6)",
++              fontWeight: tabValue === 1 ? 500 : 400,
++            }}
++          />
++        </Tabs>
++      </Box>
++      <Divider />
++
++      {/* 검색 폼 */}
++      <Box sx={{ p: 2 }}>
++        <GridDisplay.Table>
++          {/* 요청번호 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              요청번호
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <TextField
++                name="requestNumber"
++                value={formData.requestNumber}
++                onChange={handleInputChange}
++                fullWidth
++                size="small"
++                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++              />
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 고객명 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              고객명
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <TextField
++                name="customerName"
++                value={formData.customerName}
++                onChange={handleInputChange}
++                fullWidth
++                size="small"
++                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++              />
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 연락처 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              연락처
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <Stack direction="row" spacing={1} alignItems="center">
++                <TextField
++                  name="phonePrefix"
++                  value={formData.phonePrefix}
++                  onChange={handleInputChange}
++                  size="small"
++                  sx={{
++                    width: "70px",
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                  }}
++                />
++                <Typography>-</Typography>
++                <TextField
++                  name="phoneMiddle"
++                  value={formData.phoneMiddle}
++                  onChange={handleInputChange}
++                  size="small"
++                  sx={{
++                    width: "70px",
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                  }}
++                />
++                <Typography>-</Typography>
++                <TextField
++                  name="phoneSuffix"
++                  value={formData.phoneSuffix}
++                  onChange={handleInputChange}
++                  size="small"
++                  sx={{
++                    width: "70px",
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                  }}
++                />
++              </Stack>
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 조치기사명 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              조치기사명
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <TextField
++                name="engineerName"
++                value={formData.engineerName}
++                onChange={handleInputChange}
++                fullWidth
++                size="small"
++                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++              />
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 접수일 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              접수일
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <Stack direction="column" spacing={1}>
++                <TextField
++                  name="receiptDateStart"
++                  value={formData.receiptDate.start}
++                  onChange={(e) =>
++                    setFormData({
++                      ...formData,
++                      receiptDate: {
++                        ...formData.receiptDate,
++                        start: e.target.value,
++                      },
++                    })
++                  }
++                  fullWidth
++                  size="small"
++                  InputProps={{
++                    endAdornment: (
++                      <InputAdornment position="end">
++                        <IconButton edge="end" size="small">
++                          <EventIcon sx={{ color: "rgba(0, 0, 0, 0.56)" }} />
++                        </IconButton>
++                      </InputAdornment>
++                    ),
++                  }}
++                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++                />
++                <TextField
++                  name="receiptDateEnd"
++                  value={formData.receiptDate.end}
++                  onChange={(e) =>
++                    setFormData({
++                      ...formData,
++                      receiptDate: {
++                        ...formData.receiptDate,
++                        end: e.target.value,
++                      },
++                    })
++                  }
++                  fullWidth
++                  size="small"
++                  InputProps={{
++                    endAdornment: (
++                      <InputAdornment position="end">
++                        <IconButton edge="end" size="small">
++                          <EventIcon sx={{ color: "rgba(0, 0, 0, 0.56)" }} />
++                        </IconButton>
++                      </InputAdornment>
++                    ),
++                  }}
++                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++                />
++              </Stack>
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 상태 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              상태
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <Select
++                name="status"
++                value={formData.status}
++                onChange={handleSelectChange}
++                fullWidth
++                size="small"
++                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++              >
++                <MenuItem value="전체">전체</MenuItem>
++                <MenuItem value="접수">접수</MenuItem>
++                <MenuItem value="예약">예약</MenuItem>
++                <MenuItem value="조치완료">조치완료</MenuItem>
++                <MenuItem value="취소">취소</MenuItem>
++              </Select>
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          {/* 온라인 여부 */}
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              온라인 여부
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              <Select
++                name="isOnline"
++                value={formData.isOnline}
++                onChange={handleSelectChange}
++                fullWidth
++                size="small"
++                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
++              >
++                <MenuItem value="전체">전체</MenuItem>
++                <MenuItem value="Y">Y</MenuItem>
++                <MenuItem value="N">N</MenuItem>
++              </Select>
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++        </GridDisplay.Table>
++
++        {/* 버튼 영역 */}
++        <Stack
++          direction="row"
++          spacing={1.5}
++          alignItems="center"
++          justifyContent="space-between"
++          sx={{ mt: 2 }}
++        >
++          <Button
++            startIcon={<CachedIcon />}
++            variant="text"
++            onClick={handleReset}
++            sx={{ color: "rgba(0, 0, 0, 0.87)" }}
++          >
++            초기화
++          </Button>
++          <Box sx={{ flex: 1 }}>
++            <Button
++              variant="contained"
++              fullWidth
++              onClick={handleSearch}
++              sx={{
++                backgroundColor: "#0C27C1",
++                height: "42px",
++                boxShadow:
++                  "0px 3px 1px -2px rgba(0, 0, 0, 0.2), 0px 2px 2px 0px rgba(0, 0, 0, 0.14), 0px 1px 5px 0px rgba(0, 0, 0, 0.12)",
++              }}
++            >
++              검색
++            </Button>
++          </Box>
++          <IconButton size="small">
++            <LaunchIcon />
++          </IconButton>
++        </Stack>
++      </Box>
++
++      {/* 검색 결과 */}
++      <Box sx={{ px: 2, pb: 4 }}>
++        <Stack spacing={2}>
++          {searchResults.map((result, index) => (
++            <Card key={index} variant="outlined" sx={{ borderRadius: 1 }}>
++              <Paper sx={{ border: "1px solid rgba(0, 0, 0, 0.12)" }}>
++                <GridDisplay.Table>
++                  {/* AS요청번호 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      AS요청번호
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Stack
++                        direction="row"
++                        alignItems="center"
++                        justifyContent="space-between"
++                      >
++                        <Button
++                          variant="text"
++                          size="small"
++                          sx={{ color: "#0C27C1", p: 0.75, minWidth: "auto" }}
++                        >
++                          {result.requestNumber}
++                        </Button>
++                        <IconButton size="small">
++                          <LaunchIcon fontSize="small" />
++                        </IconButton>
++                      </Stack>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 조직/접수일 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      조직/접수일
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Typography variant="body2">
++                        {result.organization} /{"\n"}
++                        {result.receiptDate}
++                      </Typography>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 고객명 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      고객명
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Stack
++                        direction="row"
++                        alignItems="center"
++                        justifyContent="space-between"
++                      >
++                        <Typography variant="body2">
++                          {result.customerName}
++                        </Typography>
++                        <Button
++                          variant="text"
++                          size="small"
++                          sx={{ color: "#0C27C1", p: 0.75, minWidth: "auto" }}
++                        >
++                          {result.phoneNumber}
++                        </Button>
++                      </Stack>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 조치 상태 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      조치 상태
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Typography variant="body2">{result.status}</Typography>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 주소 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      주소
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Typography
++                        variant="body2"
++                        sx={{ whiteSpace: "pre-line" }}
++                      >
++                        {result.address}
++                      </Typography>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 조치기사명 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      조치기사명
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Typography variant="body2">
++                        {result.engineerName}
++                      </Typography>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++
++                  {/* 온라인금액 */}
++                  <GridDisplay.Row>
++                    <GridDisplay.Cell size={30} variant="head">
++                      온라인금액
++                    </GridDisplay.Cell>
++                    <GridDisplay.Cell size={70}>
++                      <Typography variant="body2">
++                        {result.onlineAmount}
++                      </Typography>
++                    </GridDisplay.Cell>
++                  </GridDisplay.Row>
++                </GridDisplay.Table>
++              </Paper>
++            </Card>
++          ))}
++        </Stack>
++      </Box>
++    </>
++  );
++});
+diff --git a/apps/as-mobile/src/pages/schedule/schedule-page.loader.ts b/apps/as-mobile/src/pages/schedule/schedule-page.loader.ts
+new file mode 100644
+index 0000000..e67c415
+--- /dev/null
++++ b/apps/as-mobile/src/pages/schedule/schedule-page.loader.ts
+@@ -0,0 +1,18 @@
++import { LoaderFunctionArgs } from "react-router-dom";
++import { z } from "zod";
++
++export async function schedulePageLoader(args: LoaderFunctionArgs) {
++  const parsedArgs = SchedulePageLoaderArgsSchema.parse(args);
++
++  return parsedArgs;
++}
++
++const SchedulePageLoaderArgsSchema = z.object({
++  request: z.custom<Request>(),
++  params: z.object({ slug: z.string() }),
++  context: z.any(),
++});
++
++export type SchedulePageLoaderArgs = z.infer<
++  typeof SchedulePageLoaderArgsSchema
++>;
+diff --git a/apps/as-mobile/src/pages/schedule/schedule-page.route.tsx b/apps/as-mobile/src/pages/schedule/schedule-page.route.tsx
+index fe66aba..77ce4ef 100644
+--- a/apps/as-mobile/src/pages/schedule/schedule-page.route.tsx
++++ b/apps/as-mobile/src/pages/schedule/schedule-page.route.tsx
+@@ -1,20 +1,34 @@
+ import type { RouteObject } from "react-router-dom";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { ROUTE_PATHS } from "@/shared/lib/react-router";
+ 
+ export const schedulePageRoute: RouteObject = {
+-  path: routePathKeys.schedule.root(),
++  path: ROUTE_PATHS.SCHEDULE.ROOT,
+   children: [
+     {
+-      path: ":slug",
++      path: ROUTE_PATHS.SCHEDULE.BY_SLUG,
+       lazy: async () => {
+-        const [Component] = await Promise.all([
++        const [loader, Component] = await Promise.all([
++          import("./schedule-page.loader").then(
++            (module) => module.schedulePageLoader,
++          ),
+           import("./schedule-page.ui").then((module) => module.SchedulePage),
+         ]);
++        return { loader, Component };
++      },
++    },
++    {
++      path: ROUTE_PATHS.SCHEDULE.BY_SLUG_CHANGE_ACTION_PLACE,
++      lazy: async () => {
++        const [Component] = await Promise.all([
++          import("./schedule-page.ui").then(
++            (module) => module.ScheduleChangeActionPlacePage,
++          ),
++        ]);
+         return { Component };
+       },
+     },
+     {
+-      path: ":slug/capa",
++      path: ROUTE_PATHS.SCHEDULE.BY_SLUG_CAPA,
+       lazy: async () => {
+         const [Component] = await Promise.all([
+           import("./schedule-page.ui").then(
+@@ -25,7 +39,7 @@ export const schedulePageRoute: RouteObject = {
+       },
+     },
+     {
+-      path: "work-status-details",
++      path: ROUTE_PATHS.SCHEDULE.WORK_STATUS_DETAILS,
+       lazy: async () => {
+         const [Component] = await Promise.all([
+           import("./schedule-page.ui").then(
+diff --git a/apps/as-mobile/src/pages/schedule/schedule-page.ui.tsx b/apps/as-mobile/src/pages/schedule/schedule-page.ui.tsx
+index 0653f49..cf3641c 100644
+--- a/apps/as-mobile/src/pages/schedule/schedule-page.ui.tsx
++++ b/apps/as-mobile/src/pages/schedule/schedule-page.ui.tsx
+@@ -1,8 +1,19 @@
++import {
++  CalendarToday,
++  Home,
++  ChevronRight,
++  ChevronLeft,
++  Add,
++  ContentCopy as ContentCopyIcon,
++  ArrowDropDown as ArrowDropDownIcon,
++  Event as EventIcon,
++} from "@mui/icons-material";
+ import {
+   Box,
+   Button,
+   Checkbox,
+   FormControl,
++  IconButton,
+   InputLabel,
+   List,
+   ListItem,
+@@ -14,11 +25,21 @@ import {
+   SelectChangeEvent,
+   Stack,
+   Typography,
++  FormControlLabel,
++  Chip,
++  TextField,
++  Tab,
++  Tabs,
++  styled,
++  Paper,
++  InputAdornment,
+ } from "@mui/material";
+ import { DateCalendar } from "@mui/x-date-pickers";
+-import { Fragment, useState } from "react";
++import { Fragment, useState, useRef, useEffect } from "react";
++import { useLoaderData, useNavigate, useLocation } from "react-router-dom";
+ import { Divider, GridDisplay } from "@erp/mui";
+ import { composeHoc, withSuspense } from "@erp/shared/hoc";
++import { routePaths } from "@/shared/lib/react-router";
+ import { FallbackLoading } from "@/shared/ui";
+ import { AppBar } from "@/widgets/layouts";
+ import { WorkStatus } from "@/widgets/schedule";
+@@ -27,8 +48,1697 @@ const enhance = composeHoc((component) =>
+   withSuspense(component, { FallbackComponent: FallbackLoading }),
+ );
+ 
++// 탭 앵커 정의
++const TAB_ANCHORS = ["action", "judgment", "cost"];
++
+ export const SchedulePage = enhance(() => {
+-  return <div>schedule</div>;
++  const { params } = useLoaderData();
++  const { slug } = params;
++  const navigate = useNavigate();
++  const location = useLocation();
++  const [selectedCategory, setSelectedCategory] =
++    useState<string>("1_1_후_바스");
++  const [myCapaChecked, setMyCapaChecked] = useState<boolean>(false);
++  const [todayCapaChecked, setTodayCapaChecked] = useState<boolean>(false);
++  const scrollContainerRef = useRef<HTMLDivElement>(null);
++  const [showLeftButton, setShowLeftButton] = useState<boolean>(false);
++  const [showRightButton, setShowRightButton] = useState<boolean>(true);
++  const [selectedTab, setSelectedTab] = useState<number>(0);
++
++  // 각 탭의 ref 생성
++  const tabRefs = [
++    useRef<HTMLDivElement>(null),
++    useRef<HTMLDivElement>(null),
++    useRef<HTMLDivElement>(null),
++  ];
++
++  // URL 해시에 따른 초기 탭 설정
++  useEffect(() => {
++    const hash = location.hash.replace("#", "");
++    const tabIndex = TAB_ANCHORS.findIndex((anchor) => anchor === hash);
++
++    if (tabIndex !== -1) {
++      setSelectedTab(tabIndex);
++      // 약간의 지연 후 스크롤 (DOM이 완전히 렌더링된 후)
++      setTimeout(() => {
++        if (tabRefs[tabIndex]?.current) {
++          tabRefs[tabIndex].current?.scrollIntoView({ behavior: "smooth" });
++        }
++      }, 300);
++    }
++  }, [location]);
++
++  const handleCategoryChange = (category: string) => {
++    setSelectedCategory(category);
++  };
++
++  const handleScrollRight = () => {
++    if (scrollContainerRef.current) {
++      scrollContainerRef.current.scrollBy({
++        left: 200,
++        behavior: "smooth",
++      });
++    }
++  };
++
++  const handleScrollLeft = () => {
++    if (scrollContainerRef.current) {
++      scrollContainerRef.current.scrollBy({
++        left: -200,
++        behavior: "smooth",
++      });
++    }
++  };
++
++  // 스크롤 이벤트 처리
++  useEffect(() => {
++    const scrollContainer = scrollContainerRef.current;
++
++    const handleScroll = () => {
++      if (scrollContainer) {
++        // 왼쪽 스크롤 위치
++        const scrollLeft = scrollContainer.scrollLeft;
++        setShowLeftButton(scrollLeft > 10);
++
++        // 오른쪽 끝에 도달했는지 확인
++        const currentPosition = Math.ceil(
++          scrollLeft + scrollContainer.clientWidth,
++        );
++        const maxScroll = scrollContainer.scrollWidth - 10;
++        const isAtEnd = currentPosition >= maxScroll;
++
++        setShowRightButton(!isAtEnd);
++      }
++    };
++
++    if (scrollContainer) {
++      scrollContainer.addEventListener("scroll", handleScroll);
++      // 초기 상태 확인
++      handleScroll();
++    }
++
++    return () => {
++      if (scrollContainer) {
++        scrollContainer.removeEventListener("scroll", handleScroll);
++      }
++    };
++  }, []);
++
++  // 탭 변경 핸들러
++  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
++    setSelectedTab(newValue);
++
++    // URL 해시 변경
++    navigate(`#${TAB_ANCHORS[newValue]}`, { replace: true });
++
++    // 선택된 탭으로 스크롤
++    if (tabRefs[newValue]?.current) {
++      tabRefs[newValue].current?.scrollIntoView({ behavior: "smooth" });
++    }
++  };
++
++  // 카테고리 옵션
++  const categories = ["1_0_바스", "1_1_바스", "1_1_후_바스", "2_0_키친판넬"];
++
++  return (
++    <>
++      <AppBar
++        back={true}
++        title="스케줄 상세"
++        endActions={
++          <Stack direction="row" spacing={0.5}>
++            <IconButton size="medium" color="inherit" aria-label="home">
++              <Home />
++            </IconButton>
++            <IconButton
++              size="medium"
++              color="inherit"
++              aria-label="schedule-list"
++            >
++              <CalendarToday />
++            </IconButton>
++          </Stack>
++        }
++      />
++
++      {/* 고객번호 및 복사 아이콘 */}
++      <Box sx={{ display: "flex", alignItems: "center", p: 2, pb: 0 }}>
++        <Typography variant="h5" fontWeight="bold" component="div">
++          24122700215
++        </Typography>
++        <IconButton size="small" sx={{ ml: 1 }}>
++          <ContentCopyIcon />
++        </IconButton>
++      </Box>
++
++      {/* 상단 버튼 그룹 */}
++      <Box sx={{ p: 2, display: "flex", gap: 1 }}>
++        <Button variant="outlined" sx={{ flex: 1 }}>
++          고객이력
++        </Button>
++        <Button variant="outlined" sx={{ flex: 1 }}>
++          시공정보
++        </Button>
++      </Box>
++
++      {/* CAPA 변경, 품목제지정 버튼 */}
++      <Box sx={{ px: 2, display: "flex", gap: 2, mb: 2 }}>
++        <Button
++          variant="outlined"
++          fullWidth
++          sx={{ py: 1.5, borderColor: "grey.300", color: "text.primary" }}
++          onClick={() => navigate(routePaths.schedule.bySlugCapa({ slug }))}
++        >
++          CAPA 변경
++        </Button>
++        <Button
++          variant="contained"
++          fullWidth
++          sx={{ py: 1.5, bgcolor: "black", color: "white" }}
++        >
++          품목제지정
++        </Button>
++      </Box>
++
++      {/* 체크박스 그룹 */}
++      <Box sx={{ px: 2, display: "flex", mb: 2 }}>
++        <FormControlLabel
++          control={
++            <Checkbox
++              checked={myCapaChecked}
++              onChange={(e) => setMyCapaChecked(e.target.checked)}
++            />
++          }
++          label="내 CAPA"
++          sx={{ mr: 4 }}
++        />
++        <FormControlLabel
++          control={
++            <Checkbox
++              checked={todayCapaChecked}
++              onChange={(e) => setTodayCapaChecked(e.target.checked)}
++            />
++          }
++          label="오늘 CAPA"
++        />
++      </Box>
++
++      {/* 카테고리 스와이프 (칩으로 구현) */}
++      <Box
++        sx={{
++          position: "sticky",
++          top: 0,
++          width: "100%",
++          mb: 2,
++          bgcolor: "white",
++          zIndex: 20,
++          pb: 1,
++          borderBottom: "1px solid rgba(0, 0, 0, 0.05)",
++        }}
++      >
++        <Box
++          ref={scrollContainerRef}
++          sx={{
++            display: "flex",
++            overflowX: "auto",
++            px: 2,
++            pb: 1,
++            pr: 6, // 오른쪽 버튼 영역 확보
++            pl: showLeftButton ? 6 : 2, // 왼쪽 버튼 영역 확보 (버튼이 있을 때만)
++            "&::-webkit-scrollbar": { display: "none" },
++            scrollbarWidth: "none",
++            msOverflowStyle: "none",
++          }}
++        >
++          {categories.map((category) => (
++            <Chip
++              key={category}
++              label={category}
++              onClick={() => handleCategoryChange(category)}
++              sx={{
++                mr: 1,
++                borderRadius: "50px",
++                height: "40px",
++                border: "1px solid #ddd",
++                bgcolor:
++                  selectedCategory === category
++                    ? "primary.main"
++                    : "transparent",
++                color: selectedCategory === category ? "white" : "text.primary",
++                "&:hover": {
++                  bgcolor:
++                    selectedCategory === category
++                      ? "primary.main"
++                      : "transparent",
++                },
++                "& .MuiChip-label": {
++                  px: 2,
++                },
++              }}
++            />
++          ))}
++        </Box>
++
++        {/* 왼쪽 화살표 버튼 */}
++        {showLeftButton && (
++          <IconButton
++            onClick={handleScrollLeft}
++            size="small"
++            sx={{
++              position: "absolute",
++              left: 0,
++              top: "50%",
++              transform: "translateY(-50%)",
++              display: "flex",
++              alignItems: "center",
++              justifyContent: "center",
++              width: "40px",
++              height: "40px",
++              backgroundColor: "white",
++              boxShadow: "3px 0px 5px rgba(0, 0, 0, 0.05)",
++              zIndex: 1,
++            }}
++          >
++            <ChevronLeft />
++          </IconButton>
++        )}
++
++        {/* 오른쪽 화살표 버튼 */}
++        {showRightButton && (
++          <IconButton
++            onClick={handleScrollRight}
++            size="small"
++            sx={{
++              position: "absolute",
++              right: 0,
++              top: "50%",
++              transform: "translateY(-50%)",
++              display: "flex",
++              alignItems: "center",
++              justifyContent: "center",
++              width: "40px",
++              height: "40px",
++              backgroundColor: "white",
++              boxShadow: "-3px 0px 5px rgba(0, 0, 0, 0.05)",
++              zIndex: 1,
++            }}
++          >
++            <ChevronRight />
++          </IconButton>
++        )}
++      </Box>
++
++      {/* 여기에 선택된 카테고리에 따른 컨텐츠가 추가될 수 있습니다 */}
++
++      {/* 고객 정보 상세 테이블 */}
++      <Box sx={{ pt: 2 }}>
++        <GridDisplay.Table>
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              원오더번호
++            </GridDisplay.Cell>
++            <GridDisplay.Cell
++              size={60}
++              display="flex"
++              alignItems="center"
++              color="primary.main"
++              fontWeight="bold"
++            >
++              0130470326
++            </GridDisplay.Cell>
++            <GridDisplay.Cell
++              size={10}
++              display="flex"
++              justifyContent="flex-end"
++            >
++              <IconButton size="small">
++                <ContentCopyIcon fontSize="small" />
++              </IconButton>
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              상태/기사/
++              <br />
++              추수금
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              접수 / 김한샘(부산) /<br />
++              조치서변경건
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              동행자
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>김한샘</GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              출고/약속
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              2024.09.04 / 2025.02.14
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              공정/코드/
++              <br />
++              수량
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>바스 / STB090243 / 1</GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              품목명
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              휴-플로어2 Cargo 모카
++              <br />
++              (2.51*2300*1750)
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              불만내용
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>
++              욕실 휴플로어 바닥부분에 물이 들어가서
++              <br />
++              꿀렁꿀렁함
++              <br />
++              - 후시 AS비용발생시 담당 TR에게 내용
++              <br />
++              전달
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              판매점
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={50}>한샘 인테리어 회사</GridDisplay.Cell>
++            <GridDisplay.Cell size={20} color="primary.main">
++              010-9999-9999
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              영업사원
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={50}>김한샘</GridDisplay.Cell>
++            <GridDisplay.Cell size={20} color="primary.main">
++              010-9999-9999
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              TR
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={50}>이샘샘</GridDisplay.Cell>
++            <GridDisplay.Cell size={20} color="primary.main">
++              010-9999-9999
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              PM
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={50}>박한</GridDisplay.Cell>
++            <GridDisplay.Cell size={20} color="primary.main">
++              010-9999-9999
++            </GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              수금예정금액
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}>0</GridDisplay.Cell>
++          </GridDisplay.Row>
++
++          <GridDisplay.Row>
++            <GridDisplay.Cell size={30} variant="head">
++              추수금 예정
++            </GridDisplay.Cell>
++            <GridDisplay.Cell size={70}></GridDisplay.Cell>
++          </GridDisplay.Row>
++        </GridDisplay.Table>
++
++        {/* 하단 버튼 그룹 */}
++        <Box sx={{ display: "flex", gap: 2, mt: 2, px: 2, mb: 4 }}>
++          <Button variant="outlined" fullWidth sx={{ py: 1.5 }}>
++            상시재고 신청(0)
++          </Button>
++          <Button variant="outlined" fullWidth sx={{ py: 1.5 }}>
++            발주자재 요청(0)
++          </Button>
++        </Box>
++      </Box>
++
++      {/* 조치/판정/비용 탭 메뉴 및 양식 */}
++      <Box sx={{ width: "100%", mt: 3, position: "relative", pb: "70px" }}>
++        {/* 탭 메뉴 - MUI Tab 컴포넌트 사용 */}
++        <Box
++          sx={{
++            borderBottom: 1,
++            borderColor: "divider",
++            position: "sticky",
++            top: "57px", // 카테고리 스와이프 영역 높이만큼 조정
++            bgcolor: "white",
++            zIndex: 10,
++          }}
++        >
++          <Tabs
++            value={selectedTab}
++            onChange={handleTabChange}
++            variant="fullWidth"
++            aria-label="처리 탭"
++            sx={{
++              "& .MuiTab-root": { py: 1.5 },
++              "& .Mui-selected": { fontWeight: "bold" },
++            }}
++          >
++            <Tab
++              label="조치"
++              id="tab-action"
++              aria-controls="tabpanel-action"
++              data-anchor="action"
++            />
++            <Tab
++              label="판정"
++              id="tab-judgment"
++              aria-controls="tabpanel-judgment"
++              data-anchor="judgment"
++            />
++            <Tab
++              label="비용"
++              id="tab-cost"
++              aria-controls="tabpanel-cost"
++              data-anchor="cost"
++            />
++          </Tabs>
++        </Box>
++
++        {/* 조치 탭 패널 */}
++        <Box
++          id="tabpanel-action"
++          ref={tabRefs[0]}
++          sx={{ p: 2 }}
++          data-tab-content="action"
++        >
++          <GridDisplay.Table>
++            {/* 조치일시 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                조치일시
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box sx={{ display: "flex", alignItems: "center" }}>
++                  <Typography sx={{ flex: 1 }}>2025.02.21</Typography>
++                  <IconButton size="small">
++                    <CalendarToday fontSize="small" />
++                  </IconButton>
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 대분류 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                대분류
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 처리결과 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                처리결과
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 처리유형 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                처리유형
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 조치비용 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                조치비용
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box
++                  sx={{
++                    display: "flex",
++                    alignItems: "center",
++                    justifyContent: "space-between",
++                  }}
++                >
++                  <Typography>0</Typography>
++                  <Typography
++                    color="primary.main"
++                    fontWeight="medium"
++                    variant="body2"
++                  >
++                    내역검색
++                  </Typography>
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 지연사유 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                지연사유
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth disabled>
++                  <Select
++                    value=""
++                    displayEmpty
++                    disabled
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled></MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 조치 내용 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                조치 내용
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  multiline
++                  rows={6}
++                  fullWidth
++                  placeholder="내용을 입력해 주세요"
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++          </GridDisplay.Table>
++        </Box>
++
++        {/* 판정 탭 패널 */}
++        <Box
++          id="tabpanel-judgment"
++          ref={tabRefs[1]}
++          sx={{ p: 2 }}
++          data-tab-content="judgment"
++        >
++          <GridDisplay.Table>
++            {/* 판정구분 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                판정구분
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 판정유형 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                판정유형
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 하자유형 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                하자유형
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 세부유형 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                세부유형
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      선택해 주세요
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 결과사진 (2장 이상, 최대 6장) */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                결과사진
++                <br />
++                (2장 이상, 최대 6장)
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box
++                  sx={{
++                    width: 80,
++                    height: 80,
++                    border: "1px solid #ddd",
++                    borderRadius: 1,
++                    display: "flex",
++                    justifyContent: "center",
++                    alignItems: "center",
++                  }}
++                >
++                  <Add sx={{ color: "text.secondary" }} />
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 제조사명 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                제조사명
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box
++                  sx={{
++                    display: "flex",
++                    alignItems: "center",
++                    justifyContent: "space-between",
++                  }}
++                >
++                  <Typography>(주)삼정퍼엔씨</Typography>
++                  <Button
++                    variant="outlined"
++                    size="small"
++                    sx={{ minWidth: 0, px: 2 }}
++                  >
++                    검색
++                  </Button>
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 제조사 코드 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                제조사 코드
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography>000354855</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 기기 시리얼 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                기기 시리얼
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  fullWidth
++                  placeholder="번호를 입력해 주세요"
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 구입 날짜 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                구입 날짜
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography>2024.10.11</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 소파수리요청 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                소파수리요청
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box sx={{ display: "flex", gap: 4 }}>
++                  <FormControlLabel
++                    control={<Checkbox size="small" />}
++                    label="발급"
++                  />
++                  <FormControlLabel
++                    control={<Checkbox size="small" />}
++                    label="미발급"
++                  />
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 점수상태 불량유형 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                점수상태
++                <br />
++                불량유형
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value=""
++                    displayEmpty
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="" disabled>
++                      이상무
++                    </MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++          </GridDisplay.Table>
++        </Box>
++
++        {/* 비용 탭 패널 */}
++        <Box
++          id="tabpanel-cost"
++          ref={tabRefs[2]}
++          sx={{ p: 2 }}
++          data-tab-content="cost"
++        >
++          <GridDisplay.Table>
++            {/* 서비스 비용 (정산) */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={100}
++                variant="head"
++                sx={{ py: 1.5, bgcolor: "#f5f5f5" }}
++              >
++                서비스 비용 (정산)
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 비용항목 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={30}
++                variant="head"
++                sx={{ position: "relative" }}
++              >
++                <Box
++                  sx={{
++                    position: "absolute",
++                    left: -10,
++                    top: "50%",
++                    transform: "translateY(-50%)",
++                    width: 8,
++                    height: 8,
++                    borderRadius: "50%",
++                    bgcolor: "error.main",
++                  }}
++                />
++                비용항목
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <FormControl fullWidth>
++                  <Select
++                    value="무상"
++                    sx={{ "& .MuiSelect-select": { py: 1.5 } }}
++                  >
++                    <MenuItem value="무상">무상</MenuItem>
++                    <MenuItem value="무상(클레임)">무상(클레임)</MenuItem>
++                    <MenuItem value="후수금">후수금</MenuItem>
++                    <MenuItem value="유상">유상</MenuItem>
++                    <MenuItem value="유상(클레임)">유상(클레임)</MenuItem>
++                    <MenuItem value="유상거부">유상거부</MenuItem>
++                  </Select>
++                </FormControl>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 후수금 예정 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                후수금 예정
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography>0</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 이전 안내 유상금액 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                이전 안내
++                <br />
++                유상금액
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography>0</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 자재비 (상시) */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                자재비 (상시)
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Box
++                  sx={{
++                    display: "flex",
++                    justifyContent: "space-between",
++                    alignItems: "center",
++                  }}
++                >
++                  <Typography>-</Typography>
++                  <Button variant="outlined" size="small" sx={{ px: 2 }}>
++                    부품/사용
++                  </Button>
++                </Box>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 조치비용 (귀책) 헤더 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={100}
++                variant="head"
++                sx={{ py: 1.5, bgcolor: "#f5f5f5", mt: 3 }}
++              >
++                조치비용 (귀책)
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 조치비용 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                조치비용
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography>0</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 부품비 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                부품비
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  value="0"
++                  fullWidth
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 시공비 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                시공비
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  value="0"
++                  fullWidth
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* (귀책)합계 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                (귀책)합계
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography fontWeight="bold">0</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* A/S 대행비용 헤더 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell
++                size={100}
++                variant="head"
++                sx={{ py: 1.5, bgcolor: "#f5f5f5", mt: 3 }}
++              >
++                A/S 대행비용
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 조치비 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                조치비
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  value="0"
++                  fullWidth
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 권역비 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                권역비
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  value="0"
++                  fullWidth
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* 평균비 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                평균비
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <TextField
++                  value="0"
++                  fullWidth
++                  sx={{
++                    "& .MuiOutlinedInput-root": { borderRadius: 1 },
++                    "& .MuiOutlinedInput-input": { py: 1.5, px: 2 },
++                  }}
++                />
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++
++            {/* (대행)합계 */}
++            <GridDisplay.Row>
++              <GridDisplay.Cell size={30} variant="head">
++                (대행)합계
++              </GridDisplay.Cell>
++              <GridDisplay.Cell size={70}>
++                <Typography fontWeight="bold">0</Typography>
++              </GridDisplay.Cell>
++            </GridDisplay.Row>
++          </GridDisplay.Table>
++        </Box>
++
++        {/* 탭 영역 하단 고정 버튼 그룹 */}
++        <Box
++          sx={{
++            position: "sticky",
++            bottom: 0,
++            left: 0,
++            right: 0,
++            padding: 1.5,
++            display: "flex",
++            justifyContent: "space-between",
++            gap: 1,
++            bgcolor: "white",
++            borderTop: "1px solid rgba(0, 0, 0, 0.12)",
++            zIndex: 10,
++          }}
++        >
++          <Button
++            variant="outlined"
++            sx={{
++              flex: 1,
++              borderRadius: 1,
++              fontSize: "0.9rem",
++              py: 1.2,
++              bgcolor: "#f5f5f5",
++              borderColor: "#e0e0e0",
++              color: "text.primary",
++            }}
++            onClick={() =>
++              navigate(routePaths.schedule.bySlugChangeActionPlace({ slug }))
++            }
++          >
++            이관
++          </Button>
++          <Button
++            variant="outlined"
++            sx={{
++              flex: 1,
++              borderRadius: 1,
++              fontSize: "0.9rem",
++              py: 1.2,
++              bgcolor: "#f5f5f5",
++              borderColor: "#e0e0e0",
++              color: "text.primary",
++            }}
++          >
++            임시
++          </Button>
++          <Button
++            variant="outlined"
++            sx={{
++              flex: 1,
++              borderRadius: 1,
++              fontSize: "0.9rem",
++              py: 1.2,
++              bgcolor: "#0028c0",
++              borderColor: "#0028c0",
++              color: "white",
++            }}
++            onClick={() =>
++              navigate(routePaths.schedule.bySlugChangeActionPlace({ slug }))
++            }
++          >
++            사전작업
++          </Button>
++          <Button
++            variant="outlined"
++            sx={{
++              flex: 1,
++              borderRadius: 1,
++              fontSize: "0.9rem",
++              py: 1.2,
++              bgcolor: "#0028c0",
++              borderColor: "#0028c0",
++              color: "white",
++            }}
++          >
++            조치완료
++          </Button>
++        </Box>
++      </Box>
++    </>
++  );
++});
++
++// 사용자 정의 스타일 컴포넌트
++const FormContainer = styled(Paper)(({ theme: _ }) => ({
++  width: "100%",
++  display: "flex",
++  flexDirection: "column",
++  borderTop: "1px solid rgba(0, 0, 0, 0.12)",
++}));
++
++const FormRow = styled(Box)(({ theme: _ }) => ({
++  display: "flex",
++  alignItems: "center",
++  borderBottom: "1px solid rgba(0, 0, 0, 0.12)",
++  width: "100%",
++}));
++
++const FormLabel = styled(Box)(({ theme: _ }) => ({
++  padding: "10px 16px",
++  width: "112px",
++  flexShrink: 0,
++}));
++
++const FormField = styled(Box)(({ theme: _ }) => ({
++  padding: "10px 16px",
++  flex: 1,
++}));
++
++const LargeTextField = styled(TextField)(({ theme: _ }) => ({
++  "& .MuiInputBase-root": {
++    padding: "16px 0",
++  },
++}));
++
++interface BodyProps {
++  onSubmit?: () => void;
++}
++
++const Body: React.FC<BodyProps> = ({ onSubmit }) => {
++  // 폼 상태 관리
++  const [formData, setFormData] = useState({
++    serviceCenter: "",
++    team: "",
++    engineer: "",
++    appointmentDate: "",
++    expectedAmount: "",
++    memo: "스타일 패키지 고객 현장입니다. 인수인계 확인서 등록",
++    complaintContent:
++      "한샘기본공사 공정/주방 세탁실 입구부분 샷시 바라보고 왼쪽 벽면 물 흐름 현상 확인요청",
++  });
++
++  // 입력값 변경 핸들러
++  const handleChange = (
++    e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>,
++  ) => {
++    const { name, value } = e.target;
++    setFormData({
++      ...formData,
++      [name as string]: value,
++    });
++  };
++
++  // 확인 버튼 클릭 핸들러
++  const handleSubmit = () => {
++    if (onSubmit) {
++      onSubmit();
++    }
++    console.log("Form submitted:", formData);
++  };
++
++  return (
++    <Box
++      sx={{
++        display: "flex",
++        flexDirection: "column",
++        width: "100%",
++        paddingBottom: "100px",
++      }}
++    >
++      {/* 폼 컨테이너 */}
++      <FormContainer elevation={0}>
++        {/* 조치처 선택 */}
++        <FormRow>
++          <FormLabel>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
++              조치처
++            </Typography>
++          </FormLabel>
++          <FormField>
++            <FormControl fullWidth variant="outlined" size="small">
++              <Select
++                name="serviceCenter"
++                value={formData.serviceCenter}
++                onChange={handleChange}
++                displayEmpty
++                IconComponent={ArrowDropDownIcon}
++                inputProps={{ "aria-label": "조치처" }}
++                renderValue={(selected) => {
++                  if (!selected) {
++                    return (
++                      <Typography color="rgba(0, 0, 0, 0.34)">
++                        선택해 주세요
++                      </Typography>
++                    );
++                  }
++                  return selected as string;
++                }}
++              >
++                <MenuItem value="">
++                  <em>선택해 주세요</em>
++                </MenuItem>
++                <MenuItem value="본사">본사</MenuItem>
++                <MenuItem value="지사">지사</MenuItem>
++                <MenuItem value="대리점">대리점</MenuItem>
++              </Select>
++            </FormControl>
++          </FormField>
++        </FormRow>
++
++        {/* 팀 선택 */}
++        <FormRow>
++          <FormLabel>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
++              팀
++            </Typography>
++          </FormLabel>
++          <FormField>
++            <FormControl fullWidth variant="outlined" size="small">
++              <Select
++                name="team"
++                value={formData.team}
++                onChange={handleChange}
++                displayEmpty
++                IconComponent={ArrowDropDownIcon}
++                inputProps={{ "aria-label": "팀" }}
++                renderValue={(selected) => {
++                  if (!selected) {
++                    return (
++                      <Typography color="rgba(0, 0, 0, 0.34)"></Typography>
++                    );
++                  }
++                  return selected as string;
++                }}
++              >
++                <MenuItem value="">
++                  <em>선택</em>
++                </MenuItem>
++                <MenuItem value="팀1">팀1</MenuItem>
++                <MenuItem value="팀2">팀2</MenuItem>
++                <MenuItem value="팀3">팀3</MenuItem>
++              </Select>
++            </FormControl>
++          </FormField>
++        </FormRow>
++
++        {/* 조치기사 선택 */}
++        <FormRow>
++          <FormLabel>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
++              조치기사
++            </Typography>
++          </FormLabel>
++          <FormField>
++            <FormControl fullWidth variant="outlined" size="small">
++              <Select
++                name="engineer"
++                value={formData.engineer}
++                onChange={handleChange}
++                displayEmpty
++                IconComponent={ArrowDropDownIcon}
++                inputProps={{ "aria-label": "조치기사" }}
++                renderValue={(selected) => {
++                  if (!selected) {
++                    return (
++                      <Typography color="rgba(0, 0, 0, 0.34)"></Typography>
++                    );
++                  }
++                  return selected as string;
++                }}
++              >
++                <MenuItem value="">
++                  <em>선택</em>
++                </MenuItem>
++                <MenuItem value="기사1">기사1</MenuItem>
++                <MenuItem value="기사2">기사2</MenuItem>
++                <MenuItem value="기사3">기사3</MenuItem>
++              </Select>
++            </FormControl>
++          </FormField>
++        </FormRow>
++
++        {/* 약속 조치일 */}
++        <FormRow>
++          <FormLabel>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
++              약속 조치일
++            </Typography>
++          </FormLabel>
++          <FormField>
++            <TextField
++              name="appointmentDate"
++              value={formData.appointmentDate}
++              onChange={handleChange}
++              fullWidth
++              size="small"
++              placeholder=""
++              InputProps={{
++                endAdornment: (
++                  <InputAdornment position="end">
++                    <IconButton edge="end">
++                      <EventIcon sx={{ color: "rgba(0, 0, 0, 0.28)" }} />
++                    </IconButton>
++                  </InputAdornment>
++                ),
++              }}
++            />
++          </FormField>
++        </FormRow>
++
++        {/* 수금예정금액 */}
++        <FormRow>
++          <FormLabel>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
++              수금예정금액
++            </Typography>
++          </FormLabel>
++          <FormField>
++            <TextField
++              name="expectedAmount"
++              value={formData.expectedAmount}
++              onChange={handleChange}
++              fullWidth
++              size="small"
++              placeholder=""
++            />
++          </FormField>
++        </FormRow>
++
++        {/* 메모 */}
++        <FormRow sx={{ flexDirection: "column", alignItems: "stretch" }}>
++          <Box sx={{ padding: "10px 16px", width: "100%" }}>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500, mb: 1 }}>
++              메모
++            </Typography>
++            <LargeTextField
++              name="memo"
++              value={formData.memo}
++              onChange={handleChange}
++              fullWidth
++              multiline
++              rows={2}
++              variant="outlined"
++            />
++          </Box>
++        </FormRow>
++
++        {/* 불만내용 */}
++        <FormRow
++          sx={{
++            flexDirection: "column",
++            alignItems: "stretch",
++            height: "130px",
++          }}
++        >
++          <Box sx={{ padding: "10px 16px", width: "100%" }}>
++            <Typography variant="subtitle2" sx={{ fontWeight: 500, mb: 1 }}>
++              불만내용
++            </Typography>
++            <LargeTextField
++              name="complaintContent"
++              value={formData.complaintContent}
++              onChange={handleChange}
++              fullWidth
++              multiline
++              rows={3}
++              variant="outlined"
++            />
++          </Box>
++        </FormRow>
++      </FormContainer>
++
++      {/* 하단 버튼 */}
++      <Box
++        sx={{
++          display: "flex",
++          width: "100%",
++          padding: "24px 16px 0",
++        }}
++      >
++        <Button
++          variant="contained"
++          fullWidth
++          onClick={handleSubmit}
++          sx={{
++            backgroundColor: "#0C27C1",
++            color: "#FFFFFF",
++            textTransform: "uppercase",
++            padding: "8px 22px",
++            boxShadow:
++              "0px 2px 1px -1px rgba(0, 0, 0, 0.2), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 1px 3px 0px rgba(0, 0, 0, 0.12)",
++            fontWeight: 500,
++            fontSize: "15px",
++            letterSpacing: "3.07px",
++            "&:hover": {
++              backgroundColor: "#0A1EA4",
++            },
++          }}
++        >
++          확인
++        </Button>
++      </Box>
++    </Box>
++  );
++};
++
++export const ScheduleChangeActionPlacePage = enhance(() => {
++  // const { params } = useLoaderData();
++  // const { slug } = params;
++  // const navigate = useNavigate();
++
++  return (
++    <>
++      <AppBar back={true} title="조치처 변경" />
++      <Body />
++      ㅇㅇ
++    </>
++  );
+ });
+ 
+ export const ScheduleCapaPage = enhance(() => {
+@@ -241,7 +1951,6 @@ export const ScheduleCapaPage = enhance(() => {
+     </>
+   );
+ });
+-
+ export const ScheduleWorkStatusDetailsPage = enhance(() => {
+   return (
+     <>
+diff --git a/apps/as-mobile/src/pages/test/test-page.route.tsx b/apps/as-mobile/src/pages/test/test-page.route.tsx
+index 44157ac..684f216 100644
+--- a/apps/as-mobile/src/pages/test/test-page.route.tsx
++++ b/apps/as-mobile/src/pages/test/test-page.route.tsx
+@@ -1,8 +1,8 @@
+ import type { RouteObject } from "react-router-dom";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { ROUTE_PATHS } from "@/shared/lib/react-router";
+ 
+ export const testPageRoute: RouteObject = {
+-  path: routePathKeys.test(),
++  path: ROUTE_PATHS.TEST,
+   lazy: async () => {
+     const [Component] = await Promise.all([
+       import("./test-page.ui").then((module) => {
+diff --git a/apps/as-mobile/src/pages/test/test-page.ui.tsx b/apps/as-mobile/src/pages/test/test-page.ui.tsx
+index 5676ac0..d665df4 100644
+--- a/apps/as-mobile/src/pages/test/test-page.ui.tsx
++++ b/apps/as-mobile/src/pages/test/test-page.ui.tsx
+@@ -3,6 +3,7 @@ import {
+   Drafts as DraftsIcon,
+   VisibilityOff,
+ } from "@mui/icons-material";
++import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+ import {
+   Alert,
+   AlertTitle,
+@@ -37,10 +38,271 @@ import {
+   Toolbar,
+   Typography,
+ } from "@mui/material";
++import {
++  // Box,
++  Paper,
++  IconButton,
++  // Typography,
++  // Chip,
++  styled,
++} from "@mui/material";
+ import { DatePicker, StaticDatePicker } from "@mui/x-date-pickers";
+ import { useState } from "react";
++import React from "react";
+ import { Divider, GridDisplay } from "@erp/mui";
+ 
++// 사용자 정의 스타일 컴포넌트
++const CustomChip = styled(Chip)<{
++  chipcolor: "blue" | "gray" | "orange" | "red";
++}>(({ chipcolor }) => {
++  const colorMap = {
++    blue: {
++      backgroundColor: "#344EE5",
++      color: "#FFFFFF",
++    },
++    gray: {
++      backgroundColor: "#EFEFEF",
++      color: "#B3B3B3",
++    },
++    orange: {
++      backgroundColor: "#FF9E34",
++      color: "#FFFFFF",
++    },
++    red: {
++      backgroundColor: "#F14A4A",
++      color: "#FFFFFF",
++    },
++  };
++
++  return {
++    ...colorMap[chipcolor],
++    fontSize: "12px",
++    height: "20px",
++    margin: "0 2px",
++    fontWeight: 400,
++    borderRadius: "4px",
++  };
++});
++
++const StatusText = styled(Typography)<{ statuscolor?: string }>(
++  ({ statuscolor }) => ({
++    color: statuscolor || "rgba(0, 0, 0, 0.6)",
++    fontSize: "14px",
++    lineHeight: "1.43",
++    fontWeight: 400,
++  }),
++);
++
++// 타입 정의
++interface ScheduleItem {
++  id: string;
++  status: string;
++  statusColor?: string;
++  tags: {
++    name: string;
++    color: "blue" | "gray" | "orange" | "red";
++  }[];
++  location: string;
++  seats: string;
++}
++
++interface ScheduleTableProps {
++  items: ScheduleItem[];
++  onItemClick?: (id: string) => void;
++}
++
++const ScheduleTable: React.FC<ScheduleTableProps> = ({
++  items,
++  onItemClick,
++}) => {
++  const handleItemClick = (id: string) => {
++    if (onItemClick) {
++      onItemClick(id);
++    }
++  };
++
++  return (
++    <Paper
++      elevation={0}
++      sx={{
++        width: "100%",
++        borderTop: "2px solid rgba(0, 0, 0, 0.12)",
++      }}
++    >
++      {items.map((item, index) => (
++        <Box
++          key={index}
++          sx={{
++            display: "flex",
++            borderBottom: "1px solid rgba(0, 0, 0, 0.12)",
++          }}
++        >
++          {/* 왼쪽 아이콘 버튼 */}
++          <Box
++            sx={{
++              width: "50px",
++              padding: "16px 0 16px 16px",
++              display: "flex",
++              alignItems: "center",
++            }}
++          >
++            <IconButton size="small" onClick={() => handleItemClick(item.id)}>
++              <ChevronRightIcon sx={{ color: "rgba(0, 0, 0, 0.56)" }} />
++            </IconButton>
++          </Box>
++
++          {/* 스케줄 내용 */}
++          <Box
++            sx={{
++              padding: "16px",
++              display: "flex",
++              flexDirection: "column",
++              gap: "4px",
++              flex: 1,
++            }}
++          >
++            {/* 상단부: ID와 태그 */}
++            <Box
++              sx={{
++                display: "flex",
++                alignItems: "center",
++                gap: "8px",
++              }}
++            >
++              {/* ID */}
++              <Typography
++                variant="subtitle1"
++                sx={{
++                  fontWeight: 500,
++                  fontSize: "16px",
++                  width: "120px",
++                }}
++              >
++                {item.id}
++              </Typography>
++
++              {/* 태그 컨테이너 */}
++              <Box sx={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
++                {item.tags.map((tag, tagIndex) => (
++                  <CustomChip
++                    key={tagIndex}
++                    label={tag.name}
++                    chipcolor={tag.color}
++                    size="small"
++                  />
++                ))}
++              </Box>
++            </Box>
++
++            {/* 하단부: 상태와 위치 정보 */}
++            <Box
++              sx={{
++                display: "flex",
++                alignItems: "center",
++                gap: "8px",
++              }}
++            >
++              {/* 상태 */}
++              <StatusText statuscolor={item.statusColor}>
++                {item.status}
++              </StatusText>
++
++              {/* 구분자 아이콘 */}
++              <Box
++                sx={{
++                  width: "24px",
++                  height: "24px",
++                  display: "flex",
++                  justifyContent: "center",
++                  alignItems: "center",
++                  backgroundColor: "rgba(0, 0, 0, 0.08)",
++                  borderRadius: "50%",
++                }}
++              />
++
++              {/* 위치 정보 */}
++              <Typography
++                variant="body2"
++                sx={{
++                  color: "rgba(0, 0, 0, 0.6)",
++                  flex: 1,
++                }}
++              >
++                {`${item.seats} / ${item.location}`}
++              </Typography>
++            </Box>
++          </Box>
++        </Box>
++      ))}
++    </Paper>
++  );
++};
++
++// 사용 예시 데이터
++const demoItems: ScheduleItem[] = [
++  {
++    id: "24122700215",
++    status: "AS접수(접)(온라인)",
++    tags: [
++      { name: "부엌", color: "blue" },
++      { name: "가구", color: "blue" },
++      { name: "건재", color: "gray" },
++      { name: "기본", color: "blue" },
++    ],
++    location: "덕풍 1동",
++    seats: "10좌석",
++  },
++  {
++    id: "24122700215",
++    status: "미완료(접)",
++    tags: [
++      { name: "부엌", color: "blue" },
++      { name: "가구", color: "gray" },
++      { name: "건재", color: "gray" },
++      { name: "기본", color: "blue" },
++    ],
++    location: "덕풍 1동, 덕풍 3동",
++    seats: "5좌석",
++  },
++  {
++    id: "24122700215",
++    status: "미완료(완)\n자재취소",
++    statusColor: "#D32F2F",
++    tags: [
++      { name: "부엌", color: "orange" },
++      { name: "가구", color: "orange" },
++      { name: "건재", color: "gray" },
++      { name: "기본", color: "gray" },
++    ],
++    location: "덕풍 1동",
++    seats: "FREE",
++  },
++  {
++    id: "24122700215",
++    status: "조치완료(완)",
++    tags: [
++      { name: "부엌", color: "gray" },
++      { name: "가구", color: "red" },
++      { name: "건재", color: "gray" },
++      { name: "기본", color: "red" },
++    ],
++    location: "덕풍 1동",
++    seats: "2좌석",
++  },
++];
++
++// 컴포넌트 사용 예시
++const ScheduleTableDemo: React.FC = () => {
++  const handleItemClick = (id: string) => {
++    console.log(`Item clicked: ${id}`);
++  };
++
++  return <ScheduleTable items={demoItems} onItemClick={handleItemClick} />;
++};
++
++// export default ScheduleTable;
++// export { ScheduleTableDemo, type ScheduleItem };
++
+ export function TestPage() {
+   const [open, setOpen] = useState(false);
+ 
+@@ -271,6 +533,7 @@ export function TestPage() {
+           }}
+         />
+       </Grid>
++      <ScheduleTableDemo />
+       <div></div>
+     </>
+   );
+diff --git a/apps/as-mobile/src/shared/lib/react-router/react-router.paths.ts b/apps/as-mobile/src/shared/lib/react-router/react-router.paths.ts
+index 2b535b2..98bc359 100644
+--- a/apps/as-mobile/src/shared/lib/react-router/react-router.paths.ts
++++ b/apps/as-mobile/src/shared/lib/react-router/react-router.paths.ts
+@@ -1,28 +1,57 @@
++import { generatePath } from "react-router-dom";
+ import { SlugPageParams } from "./react-router.types";
+ 
+-export const routePathKeys = {
+-  root: "",
+-  home() {
+-    return `${routePathKeys.root}/`;
++export const ROUTE_PATHS = {
++  ROOT: "",
++  HOME: "/",
++  SCHEDULE: {
++    ROOT: "schedule",
++    BY_SLUG: ":slug",
++    BY_SLUG_CHANGE_ACTION_PLACE: ":slug/change-action-place",
++    BY_SLUG_CAPA: ":slug/capa",
++    WORK_STATUS_DETAILS: "work-status-details",
+   },
+-  schedule: {
+-    root() {
+-      return `${routePathKeys.root}/schedule`;
+-    },
+-    bySlug({ slug }: SlugPageParams) {
+-      return `${routePathKeys.schedule.root()}/${slug}`;
+-    },
+-    bySlugCapa({ slug }: SlugPageParams) {
+-      return `${routePathKeys.schedule.bySlug({ slug })}/capa`;
+-    },
+-    workStatusDetails() {
+-      return `${routePathKeys.schedule.root()}/work-status-details`;
+-    },
++  INQUIRY: {
++    ROOT: "inquiry",
++    BY_SLUG: ":slug",
+   },
+-  test() {
+-    return `${routePathKeys.root}/test`;
++  TEST: "test",
++  ERROR_PAGE_404: "404",
++} as const;
++
++export const routePaths = {
++  root: () => ROUTE_PATHS.ROOT,
++  home: () => ROUTE_PATHS.HOME,
++  schedule: {
++    root: () => `${routePaths.root()}/${ROUTE_PATHS.SCHEDULE.ROOT}`,
++    bySlug: (params: SlugPageParams) =>
++      generatePath(
++        `${routePaths.schedule.root()}/${ROUTE_PATHS.SCHEDULE.BY_SLUG}`,
++        params,
++      ),
++    bySlugChangeActionPlace: (params: SlugPageParams) =>
++      generatePath(
++        `${routePaths.schedule.root()}/${ROUTE_PATHS.SCHEDULE.BY_SLUG_CHANGE_ACTION_PLACE}`,
++        params,
++      ),
++    bySlugCapa: (params: SlugPageParams) =>
++      generatePath(
++        `${routePaths.schedule.root()}/${ROUTE_PATHS.SCHEDULE.BY_SLUG_CAPA}`,
++        params,
++      ),
++    workStatusDetails: () =>
++      generatePath(
++        `${routePaths.schedule.root()}/${ROUTE_PATHS.SCHEDULE.WORK_STATUS_DETAILS}`,
++      ),
+   },
+-  errorPage404() {
+-    return `${routePathKeys.root}/404`;
++  inquiry: {
++    root: () => `${routePaths.root()}/${ROUTE_PATHS.INQUIRY.ROOT}`,
++    bySlug: (params: SlugPageParams) =>
++      generatePath(
++        `${routePaths.inquiry.root()}/${ROUTE_PATHS.INQUIRY.BY_SLUG}`,
++        params,
++      ),
+   },
++  test: () => `${routePaths.root()}/${ROUTE_PATHS.TEST}`,
++  errorPage404: () => `${routePaths.root()}/${ROUTE_PATHS.ERROR_PAGE_404}`,
+ } as const;
+diff --git a/apps/as-mobile/src/widgets/layouts/app-bar.ui.tsx b/apps/as-mobile/src/widgets/layouts/app-bar.ui.tsx
+index cf80153..19c91d2 100644
+--- a/apps/as-mobile/src/widgets/layouts/app-bar.ui.tsx
++++ b/apps/as-mobile/src/widgets/layouts/app-bar.ui.tsx
+@@ -14,7 +14,7 @@ type BaseAppBarProps = {
+ 
+ type AppBarWithBackProps = BaseAppBarProps & {
+   startActions?: never;
+-  endActions?: never;
++  endActions?: React.ReactNode;
+   back: boolean;
+ };
+ 
+diff --git a/apps/as-mobile/src/widgets/schedule/work-status/work-status.ui.tsx b/apps/as-mobile/src/widgets/schedule/work-status/work-status.ui.tsx
+index f6d31b0..4611300 100644
+--- a/apps/as-mobile/src/widgets/schedule/work-status/work-status.ui.tsx
++++ b/apps/as-mobile/src/widgets/schedule/work-status/work-status.ui.tsx
+@@ -15,7 +15,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
+ import { format } from "date-fns";
+ import { Fragment } from "react";
+ import { useNavigate } from "react-router-dom";
+-import { routePathKeys } from "@/shared/lib/react-router";
++import { routePaths } from "@/shared/lib/react-router";
+ import { workStatusQueryOptions } from "@/entities/schedule";
+ 
+ type WorkStatusProps = {
+@@ -122,7 +122,7 @@ function DetailsButton() {
+       variant="outlined"
+       size="small"
+       color="secondary"
+-      onClick={() => navigate(routePathKeys.schedule.workStatusDetails())}
++      onClick={() => navigate(routePaths.schedule.workStatusDetails())}
+     >
+       상세보기
+     </Button>
+diff --git a/configs/eslint-config/src/config/react.js b/configs/eslint-config/src/config/react.js
+index 9aa6a38..b64de8a 100644
+--- a/configs/eslint-config/src/config/react.js
++++ b/configs/eslint-config/src/config/react.js
+@@ -25,6 +25,8 @@ export const reactConfig = tseslint.config(
+       ...reactHooks.configs.recommended.rules,
+       // React scope no longer necessary with new JSX transform.
+       "react/react-in-jsx-scope": "off",
++      // Disable prop-types check as we're using TypeScript
++      "react/prop-types": "off",
+     },
+   },
+ );
